@@ -349,9 +349,9 @@ protected:
 
     bool WriteDouble(double d) {
         if (internal::Double(d).IsNanOrInf()) {
-            if (!(writeFlags & kWriteNanAndInfFlag) && !(writeFlags & kWriteNanAndInfNullFlag))
+            RAPIDJSON_IF_CONSTEXPR (!(writeFlags & kWriteNanAndInfFlag) && !(writeFlags & kWriteNanAndInfNullFlag))
                 return false;
-            if (writeFlags & kWriteNanAndInfNullFlag) {
+            RAPIDJSON_IF_CONSTEXPR (writeFlags & kWriteNanAndInfNullFlag) {
                 PutReserve(*os_, 4);
                 PutUnsafe(*os_, 'n'); PutUnsafe(*os_, 'u'); PutUnsafe(*os_, 'l'); PutUnsafe(*os_, 'l');
                 return true;
@@ -445,7 +445,7 @@ protected:
                     PutUnsafe(*os_, hexDigits[static_cast<unsigned char>(c) & 0xF]);
                 }
             }
-            else if (RAPIDJSON_UNLIKELY(!(writeFlags & kWriteValidateEncodingFlag ? 
+            else if (RAPIDJSON_UNLIKELY(!(writeFlags & kWriteValidateEncodingFlag ?
                 Transcoder<SourceEncoding, TargetEncoding>::Validate(is, *os_) :
                 Transcoder<SourceEncoding, TargetEncoding>::TranscodeUnsafe(is, *os_))))
                 return false;

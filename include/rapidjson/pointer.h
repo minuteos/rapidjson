@@ -28,12 +28,6 @@ RAPIDJSON_DIAG_PUSH
 RAPIDJSON_DIAG_OFF(4512) // assignment operator could not be generated
 #endif
 
-#if defined(RAPIDJSON_CPLUSPLUS) && RAPIDJSON_CPLUSPLUS >= 201703L
-#define RAPIDJSON_IF_CONSTEXPR if constexpr
-#else
-#define RAPIDJSON_IF_CONSTEXPR if
-#endif
-
 RAPIDJSON_NAMESPACE_BEGIN
 
 static const SizeType kPointerInvalidIndex = ~SizeType(0);  //!< Represents an invalid index in GenericPointer::Token

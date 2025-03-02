@@ -557,7 +557,7 @@ public:
     */
     template <unsigned parseFlags, typename InputStream, typename Handler>
     ParseResult Parse(InputStream& is, Handler& handler) {
-        if (parseFlags & kParseIterativeFlag)
+        RAPIDJSON_IF_CONSTEXPR (parseFlags & kParseIterativeFlag)
             return IterativeParse<parseFlags>(is, handler);
 
         parseResult_.Clear();
@@ -575,7 +575,7 @@ public:
             ParseValue<parseFlags>(is, handler);
             RAPIDJSON_PARSE_ERROR_EARLY_RETURN(parseResult_);
 
-            if (!(parseFlags & kParseStopWhenDoneFlag)) {
+            RAPIDJSON_IF_CONSTEXPR (!(parseFlags & kParseStopWhenDoneFlag)) {
                 SkipWhitespaceAndComments<parseFlags>(is);
                 RAPIDJSON_PARSE_ERROR_EARLY_RETURN(parseResult_);
 
@@ -638,7 +638,7 @@ public:
                 state_ = d;
 
                 // If StopWhenDone is not set...
-                if (!(parseFlags & kParseStopWhenDoneFlag)) {
+                RAPIDJSON_IF_CONSTEXPR (!(parseFlags & kParseStopWhenDoneFlag)) {
                     // ... and extra non-whitespace data is found...
                     SkipWhitespaceAndComments<parseFlags>(is);
                     if (is.Peek() != '\0') {
@@ -711,7 +711,7 @@ private:
     void SkipWhitespaceAndComments(InputStream& is) {
         SkipWhitespace(is);
 
-        if (parseFlags & kParseCommentsFlag) {
+        RAPIDJSON_IF_CONSTEXPR (parseFlags & kParseCommentsFlag) {
             while (RAPIDJSON_UNLIKELY(Consume(is, '/'))) {
                 if (Consume(is, '*')) {
                     while (true) {
@@ -792,7 +792,7 @@ private:
                     RAPIDJSON_PARSE_ERROR(kParseErrorObjectMissCommaOrCurlyBracket, is.Tell()); break; // This useless break is only for making warning and coverage happy
             }
 
-            if (parseFlags & kParseTrailingCommasFlag) {
+            RAPIDJSON_IF_CONSTEXPR (parseFlags & kParseTrailingCommasFlag) {
                 if (is.Peek() == '}') {
                     if (RAPIDJSON_UNLIKELY(!handler.EndObject(memberCount)))
                         RAPIDJSON_PARSE_ERROR(kParseErrorTermination, is.Tell());
@@ -841,7 +841,7 @@ private:
             else
                 RAPIDJSON_PARSE_ERROR(kParseErrorArrayMissCommaOrSquareBracket, is.Tell());
 
-            if (parseFlags & kParseTrailingCommasFlag) {
+            RAPIDJSON_IF_CONSTEXPR (parseFlags & kParseTrailingCommasFlag) {
                 if (is.Peek() == ']') {
                     if (RAPIDJSON_UNLIKELY(!handler.EndArray(elementCount)))
                         RAPIDJSON_PARSE_ERROR(kParseErrorTermination, is.Tell());
@@ -964,7 +964,7 @@ private:
         s.Take();  // Skip '\"'
 
         bool success = false;
-        if (parseFlags & kParseInsituFlag) {
+        RAPIDJSON_IF_CONSTEXPR (parseFlags & kParseInsituFlag) {
             typename InputStream::Ch *head = s.PutBegin();
             ParseStringToStream<parseFlags, SourceEncoding, SourceEncoding>(s, s);
             RAPIDJSON_PARSE_ERROR_EARLY_RETURN_VOID;
@@ -1003,7 +1003,7 @@ private:
 
         for (;;) {
             // Scan and copy string before "\\\"" or < 0x20. This is an optional optimzation.
-            if (!(parseFlags & kParseValidateEncodingFlag))
+            RAPIDJSON_IF_CONSTEXPR (!(parseFlags & kParseValidateEncodingFlag))
                 ScanCopyUnescapedString(is, os);
 
             Ch c = is.Peek();
@@ -1682,8 +1682,8 @@ private:
         // Finish parsing, call event according to the type of number.
         bool cont = true;
 
-        if (parseFlags & kParseNumbersAsStringsFlag) {
-            if (parseFlags & kParseInsituFlag) {
+        RAPIDJSON_IF_CONSTEXPR (parseFlags & kParseNumbersAsStringsFlag) {
+            RAPIDJSON_IF_CONSTEXPR (parseFlags & kParseInsituFlag) {
                 s.Pop();  // Pop stack no matter if it will be used or not.
                 typename InputStream::Ch* head = is.PutBegin();
                 const size_t length = s.Tell() - startOffset;
@@ -1711,7 +1711,7 @@ private:
 
            if (useDouble) {
                int p = exp + expFrac;
-               if (parseFlags & kParseFullPrecisionFlag)
+               RAPIDJSON_IF_CONSTEXPR (parseFlags & kParseFullPrecisionFlag)
                    d = internal::StrtodFullPrecision(d, p, decimal, length, decimalPosition, exp);
                else
                    d = internal::StrtodNormalPrecision(d, p);
@@ -2080,7 +2080,7 @@ private:
         case IterativeParsingObjectFinishState:
         {
             // Transit from delimiter is only allowed when trailing commas are enabled
-            if (!(parseFlags & kParseTrailingCommasFlag) && src == IterativeParsingMemberDelimiterState) {
+            RAPIDJSON_IF_CONSTEXPR (!(parseFlags & kParseTrailingCommasFlag) && src == IterativeParsingMemberDelimiterState) {
                 RAPIDJSON_PARSE_ERROR_NORETURN(kParseErrorObjectMissName, is.Tell());
                 return IterativeParsingErrorState;
             }
@@ -2110,7 +2110,7 @@ private:
         case IterativeParsingArrayFinishState:
         {
             // Transit from delimiter is only allowed when trailing commas are enabled
-            if (!(parseFlags & kParseTrailingCommasFlag) && src == IterativeParsingElementDelimiterState) {
+            RAPIDJSON_IF_CONSTEXPR (!(parseFlags & kParseTrailingCommasFlag) && src == IterativeParsingElementDelimiterState) {
                 RAPIDJSON_PARSE_ERROR_NORETURN(kParseErrorValueInvalid, is.Tell());
                 return IterativeParsingErrorState;
             }
