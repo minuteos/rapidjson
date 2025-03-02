@@ -1477,7 +1477,11 @@ private:
                 (parseFlags & kParseInsituFlag) == 0> s(*this, copy.s);
 
         size_t startOffset = s.Tell();
+#if RAPIDJSON_FAST32
+        float f = 0.0f;
+#else
         double d = 0.0;
+#endif
         bool useNanOrInf = false;
 
         // Parse minus
@@ -1485,8 +1489,12 @@ private:
 
         // Parse int: zero / ( digit1-9 *DIGIT )
         unsigned i = 0;
+#if !RAPIDJSON_FAST32
         uint64_t i64 = 0;
         bool use64bit = false;
+#else
+        bool useFloat = false;
+#endif
         int significandDigit = 0;
         if (RAPIDJSON_UNLIKELY(s.Peek() == '0')) {
             i = 0;
@@ -1499,8 +1507,13 @@ private:
                 while (RAPIDJSON_LIKELY(s.Peek() >= '0' && s.Peek() <= '9')) {
                     if (RAPIDJSON_UNLIKELY(i >= 214748364)) { // 2^31 = 2147483648
                         if (RAPIDJSON_LIKELY(i != 214748364 || s.Peek() > '8')) {
+#if RAPIDJSON_FAST32
+                            f = i;
+                            useFloat = true;
+#else
                             i64 = i;
                             use64bit = true;
+#endif
                             break;
                         }
                     }
@@ -1511,8 +1524,13 @@ private:
                 while (RAPIDJSON_LIKELY(s.Peek() >= '0' && s.Peek() <= '9')) {
                     if (RAPIDJSON_UNLIKELY(i >= 429496729)) { // 2^32 - 1 = 4294967295
                         if (RAPIDJSON_LIKELY(i != 429496729 || s.Peek() > '5')) {
+#if RAPIDJSON_FAST32
+                            f = i;
+                            useFloat = true;
+#else
                             i64 = i;
                             use64bit = true;
+#endif
                             break;
                         }
                     }
@@ -1524,13 +1542,21 @@ private:
         else if ((parseFlags & kParseNanAndInfFlag) && RAPIDJSON_LIKELY((s.Peek() == 'I' || s.Peek() == 'N'))) {
             if (Consume(s, 'N')) {
                 if (Consume(s, 'a') && Consume(s, 'N')) {
+#if RAPIDJSON_FAST32
+                    f = std::numeric_limits<float>::quiet_NaN();
+#else
                     d = std::numeric_limits<double>::quiet_NaN();
+#endif
                     useNanOrInf = true;
                 }
             }
             else if (RAPIDJSON_LIKELY(Consume(s, 'I'))) {
                 if (Consume(s, 'n') && Consume(s, 'f')) {
+#if RAPIDJSON_FAST32
+                    f = (minus ? -std::numeric_limits<float>::infinity() : std::numeric_limits<float>::infinity());
+#else
                     d = (minus ? -std::numeric_limits<double>::infinity() : std::numeric_limits<double>::infinity());
+#endif
                     useNanOrInf = true;
 
                     if (RAPIDJSON_UNLIKELY(s.Peek() == 'i' && !(Consume(s, 'i') && Consume(s, 'n')
@@ -1547,6 +1573,7 @@ private:
         else
             RAPIDJSON_PARSE_ERROR(kParseErrorValueInvalid, s.Tell());
 
+#if !RAPIDJSON_FAST32
         // Parse 64bit int
         bool useDouble = false;
         if (use64bit) {
@@ -1580,6 +1607,14 @@ private:
                 d = d * 10 + (s.TakePush() - '0');
             }
         }
+#else
+        // Use float for what doesn't fit into int
+        if (useFloat) {
+            while (RAPIDJSON_LIKELY(s.Peek() >= '0' && s.Peek() <= '9')) {
+                f = f * 10 + (s.TakePush() - '0');
+            }
+        }
+#endif
 
         // Parse frac = decimal-point 1*DIGIT
         int expFrac = 0;
@@ -1590,6 +1625,12 @@ private:
             if (RAPIDJSON_UNLIKELY(!(s.Peek() >= '0' && s.Peek() <= '9')))
                 RAPIDJSON_PARSE_ERROR(kParseErrorNumberMissFraction, s.Tell());
 
+#if RAPIDJSON_FAST32
+            if (!useFloat) {
+                f = static_cast<float>(i);
+                useFloat = true;
+            }
+#else
             if (!useDouble) {
 #if RAPIDJSON_64BIT
                 // Use i64 to store significand in 64-bit architecture
@@ -1614,14 +1655,24 @@ private:
 #endif
                 useDouble = true;
             }
+#endif
 
             while (RAPIDJSON_LIKELY(s.Peek() >= '0' && s.Peek() <= '9')) {
+#if RAPIDJSON_FAST32
+                if (significandDigit < 8) {
+                    f = f * 10 + (s.TakePush() - '0');
+                    --expFrac;
+                    if (RAPIDJSON_LIKELY(f > 0.0f))
+                        significandDigit++;
+                }
+#else
                 if (significandDigit < 17) {
                     d = d * 10.0 + (s.TakePush() - '0');
                     --expFrac;
                     if (RAPIDJSON_LIKELY(d > 0.0))
                         significandDigit++;
                 }
+#endif
                 else
                     s.TakePush();
             }
@@ -1632,10 +1683,17 @@ private:
         // Parse exp = e [ minus / plus ] 1*DIGIT
         int exp = 0;
         if (!useNanOrInf && (Consume(s, 'e') || Consume(s, 'E'))) {
+#if RAPIDJSON_FAST32
+            if (!useFloat) {
+                f = static_cast<float>(i);
+                useFloat = true;
+            }
+#else
             if (!useDouble) {
                 d = static_cast<double>(use64bit ? i64 : i);
                 useDouble = true;
             }
+#endif
 
             bool expMinus = false;
             if (Consume(s, '+'))
@@ -1664,7 +1722,11 @@ private:
                     }
                 }
                 else {  // positive exp
+#if RAPIDJSON_FAST32
+                    int maxExp = 38 - expFrac;
+#else
                     int maxExp = 308 - expFrac;
+#endif
                     while (RAPIDJSON_LIKELY(s.Peek() >= '0' && s.Peek() <= '9')) {
                         exp = exp * 10 + static_cast<int>(s.Take() - '0');
                         if (RAPIDJSON_UNLIKELY(exp > maxExp))
@@ -1709,6 +1771,27 @@ private:
            size_t length = s.Length();
            const NumberCharacter* decimal = s.Pop();  // Pop stack no matter if it will be used or not.
 
+#if RAPIDJSON_FAST32
+           // unused, no FullPrecision mode for float
+           (void)decimal;
+           (void)length;
+           (void)decimalPosition;
+
+           if (useFloat) {
+               int p = exp + expFrac;
+               f = internal::StrtofNormalPrecision(f, p);
+
+               // Use > max, instead of == inf, to fix bogus warning -Wfloat-equal
+               if (f > (std::numeric_limits<float>::max)()) {
+                   // Overflow
+                   RAPIDJSON_PARSE_ERROR(kParseErrorNumberTooBig, startOffset);
+               }
+
+               cont = handler.Float(minus ? -f : f);
+           } else if (useNanOrInf) {
+               cont = handler.Float(f);
+           }
+#else
            if (useDouble) {
                int p = exp + expFrac;
                RAPIDJSON_IF_CONSTEXPR (parseFlags & kParseFullPrecisionFlag)
@@ -1728,13 +1811,18 @@ private:
            else if (useNanOrInf) {
                cont = handler.Double(d);
            }
+#endif
            else {
+#if RAPIDJSON_FAST32
+               if (false) {}
+#else
                if (use64bit) {
                    if (minus)
                        cont = handler.Int64(static_cast<int64_t>(~i64 + 1));
                    else
                        cont = handler.Uint64(i64);
                }
+#endif
                else {
                    if (minus)
                        cont = handler.Int(static_cast<int32_t>(~i + 1));

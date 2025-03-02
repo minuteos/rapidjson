@@ -45,6 +45,26 @@ inline double StrtodNormalPrecision(double d, int p) {
     return d;
 }
 
+inline float FastPathF(float significand, int exp) {
+    if (exp < -38)
+        return 0.0;
+    else if (exp >= 0)
+        return significand * internal::Pow10f(exp);
+    else
+        return significand / internal::Pow10f(-exp);
+}
+
+inline float StrtofNormalPrecision(float f, int p) {
+    if (p < -38) {
+        // Prevent expSum < -308, making Pow10(p) = 0
+        f = FastPathF(f, -38);
+        f = FastPathF(f, p + 38);
+    }
+    else
+        f = FastPathF(f, p);
+    return f;
+}
+
 template <typename T>
 inline T Min3(T a, T b, T c) {
     T m = a;
