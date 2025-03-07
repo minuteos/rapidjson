@@ -72,6 +72,38 @@ private:
     };
 };
 
+class Float {
+public:
+    Float() {}
+    Float(float f) : f_(f) {}
+    Float(uint32_t u) : u_(u) {}
+
+    float Value() const { return f_; }
+    uint32_t UintValue() const { return u_; }
+
+    bool Sign() const { return (u_ & kSignMask) != 0; }
+    uint32_t Significand() const { return u_ & kSignificandMask; }
+
+    bool IsNan() const { return (u_ & kExponentMask) == kExponentMask && Significand() != 0; }
+    bool IsInf() const { return (u_ & kExponentMask) == kExponentMask && Significand() == 0; }
+    bool IsNanOrInf() const { return (u_ & kExponentMask) == kExponentMask; }
+    bool IsNormal() const { return (u_ & kExponentMask) != 0 || Significand() == 0; }
+    bool IsZero() const { return (u_ & (kExponentMask | kSignificandMask)) == 0; }
+
+private:
+    static const int kSignificandSize = 23;
+    static const int kExponentBias = 0x3FF;
+    static const int kDenormalExponent = 1 - kExponentBias;
+    static const uint32_t kSignMask = 0x80000000;
+    static const uint32_t kExponentMask = 0x7F800000;
+    static const uint32_t kSignificandMask = 0x007FFFFF;
+
+    union {
+        float f_;
+        uint32_t u_;
+    };
+};
+
 } // namespace internal
 RAPIDJSON_NAMESPACE_END
 

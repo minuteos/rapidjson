@@ -1494,6 +1494,7 @@ private:
         bool use64bit = false;
 #else
         bool useFloat = false;
+        int discardedDigits = 0;
 #endif
         int significandDigit = 0;
         if (RAPIDJSON_UNLIKELY(s.Peek() == '0')) {
@@ -1508,7 +1509,6 @@ private:
                     if (RAPIDJSON_UNLIKELY(i >= 214748364)) { // 2^31 = 2147483648
                         if (RAPIDJSON_LIKELY(i != 214748364 || s.Peek() > '8')) {
 #if RAPIDJSON_FAST32
-                            f = i;
                             useFloat = true;
 #else
                             i64 = i;
@@ -1525,7 +1525,6 @@ private:
                     if (RAPIDJSON_UNLIKELY(i >= 429496729)) { // 2^32 - 1 = 4294967295
                         if (RAPIDJSON_LIKELY(i != 429496729 || s.Peek() > '5')) {
 #if RAPIDJSON_FAST32
-                            f = i;
                             useFloat = true;
 #else
                             i64 = i;
@@ -1608,10 +1607,11 @@ private:
             }
         }
 #else
-        // Use float for what doesn't fit into int
+        // Just skip over the remaining digits but count them for the exponent
         if (useFloat) {
             while (RAPIDJSON_LIKELY(s.Peek() >= '0' && s.Peek() <= '9')) {
-                f = f * 10 + (s.TakePush() - '0');
+                s.TakePush();
+                discardedDigits++;
             }
         }
 #endif
@@ -1626,10 +1626,7 @@ private:
                 RAPIDJSON_PARSE_ERROR(kParseErrorNumberMissFraction, s.Tell());
 
 #if RAPIDJSON_FAST32
-            if (!useFloat) {
-                f = static_cast<float>(i);
-                useFloat = true;
-            }
+            useFloat = true;
 #else
             if (!useDouble) {
 #if RAPIDJSON_64BIT
@@ -1659,10 +1656,11 @@ private:
 
             while (RAPIDJSON_LIKELY(s.Peek() >= '0' && s.Peek() <= '9')) {
 #if RAPIDJSON_FAST32
-                if (significandDigit < 8) {
-                    f = f * 10 + (s.TakePush() - '0');
+                if (significandDigit < 9) {
+                    // take up to 9 digits for the significand
+                    i = i * 10 + (s.TakePush() - '0');
                     --expFrac;
-                    if (RAPIDJSON_LIKELY(f > 0.0f))
+                    if (RAPIDJSON_LIKELY(i > 0))
                         significandDigit++;
                 }
 #else
@@ -1778,8 +1776,11 @@ private:
            (void)decimalPosition;
 
            if (useFloat) {
-               int p = exp + expFrac;
-               f = internal::StrtofNormalPrecision(f, p);
+               int p = exp + expFrac + discardedDigits;
+#ifndef RAPIDJSON_FAST32_ITOF
+#error "RAPIDJSON_FAST32_ITOF must be defined when using RAPIDJSON_FAST32"
+#endif
+               f = RAPIDJSON_FAST32_ITOF(minus, i, p);
 
                // Use > max, instead of == inf, to fix bogus warning -Wfloat-equal
                if (f > (std::numeric_limits<float>::max)()) {
@@ -1787,7 +1788,7 @@ private:
                    RAPIDJSON_PARSE_ERROR(kParseErrorNumberTooBig, startOffset);
                }
 
-               cont = handler.Float(minus ? -f : f);
+               cont = handler.Float(f);
            } else if (useNanOrInf) {
                cont = handler.Float(f);
            }

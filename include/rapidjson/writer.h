@@ -193,6 +193,9 @@ public:
         \return Whether it is succeed.
     */
     bool Double(double d)       { Prefix(kNumberType); return EndValue(WriteDouble(d)); }
+#if RAPIDJSON_FAST32 && defined(RAPIDJSON_FAST32_FTOA)
+    bool Float(float f)         { Prefix(kNumberType); return EndValue(WriteFloat(f)); }
+#endif
 
     bool RawNumber(const Ch* str, SizeType length, bool copy = false) {
         RAPIDJSON_ASSERT(str != 0);
@@ -379,6 +382,41 @@ protected:
             PutUnsafe(*os_, static_cast<typename OutputStream::Ch>(*p));
         return true;
     }
+
+#if RAPIDJSON_FAST32 && defined(RAPIDJSON_FAST32_FTOA)
+    bool WriteFloat(float f) {
+        if (internal::Float(f).IsNanOrInf()) {
+            RAPIDJSON_IF_CONSTEXPR (!(writeFlags & kWriteNanAndInfFlag) && !(writeFlags & kWriteNanAndInfNullFlag))
+                return false;
+            RAPIDJSON_IF_CONSTEXPR (writeFlags & kWriteNanAndInfNullFlag) {
+                PutReserve(*os_, 4);
+                PutUnsafe(*os_, 'n'); PutUnsafe(*os_, 'u'); PutUnsafe(*os_, 'l'); PutUnsafe(*os_, 'l');
+                return true;
+            }
+            if (internal::Float(f).IsNan()) {
+                PutReserve(*os_, 3);
+                PutUnsafe(*os_, 'N'); PutUnsafe(*os_, 'a'); PutUnsafe(*os_, 'N');
+                return true;
+            }
+            if (internal::Float(f).Sign()) {
+                PutReserve(*os_, 9);
+                PutUnsafe(*os_, '-');
+            }
+            else
+                PutReserve(*os_, 8);
+            PutUnsafe(*os_, 'I'); PutUnsafe(*os_, 'n'); PutUnsafe(*os_, 'f');
+            PutUnsafe(*os_, 'i'); PutUnsafe(*os_, 'n'); PutUnsafe(*os_, 'i'); PutUnsafe(*os_, 't'); PutUnsafe(*os_, 'y');
+            return true;
+        }
+
+        char buffer[25];
+        char* end = RAPIDJSON_FAST32_FTOA(f, buffer, maxDecimalPlaces_);
+        PutReserve(*os_, static_cast<size_t>(end - buffer));
+        for (char* p = buffer; p != end; ++p)
+            PutUnsafe(*os_, static_cast<typename OutputStream::Ch>(*p));
+        return true;
+    }
+#endif
 
     bool WriteString(const Ch* str, SizeType length)  {
         static const typename OutputStream::Ch hexDigits[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
