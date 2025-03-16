@@ -292,9 +292,10 @@ public:
 protected:
     //! Information for each nested level
     struct Level {
-        Level(bool inArray_) : valueCount(0), inArray(inArray_) {}
+        Level(bool inArray_) : valueCount(0), inArray(inArray_), comment(false) {}
         size_t valueCount;  //!< number of values in this level
         bool inArray;       //!< true if in array, otherwise in object
+        bool comment;       //!< true if a comment has been written after the last value (i.e. terminator is already present)
     };
 
     bool WriteNull()  {

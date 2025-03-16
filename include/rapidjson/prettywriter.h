@@ -208,11 +208,57 @@ public:
         return Base::EndValue(Base::WriteRawValue(json, length));
     }
 
+    bool CommentLine(const Ch* comment) { return CommentLine(comment, internal::StrLen(comment)); }
+    bool CommentLine(const Ch* comment, size_t length) {
+        return WriteComment(comment, length, false);
+    }
+
+    bool CommentInline(const Ch* comment) { return CommentInline(comment, internal::StrLen(comment)); }
+    bool CommentInline(const Ch* comment, size_t length) {
+        return WriteComment(comment, length, true);
+    }
+
 protected:
+    bool WriteComment(const Ch* comment, size_t length, bool inlineComment) {
+        RAPIDJSON_ASSERT(Base::level_stack_.GetSize() != 0);  // comments cannot be written at root level
+        typename Base::Level* level = Base::level_stack_.template Top<typename Base::Level>();
+
+        if (level->valueCount > 0) {
+            // terminate last value
+            if (!level->inArray) {
+                // must not comment between object key and value
+                RAPIDJSON_ASSERT(level->valueCount % 2 == 0);
+            }
+            Base::os_->Put(',');
+        }
+
+        if (inlineComment) {
+            Base::os_->Put(' ');
+        } else {
+            Base::os_->Put('\n');
+            WriteIndent();
+        }
+        level->comment = true;
+        Base::os_->Put('/');
+        Base::os_->Put('/');
+        Base::os_->Put(' ');
+        return Base::WriteRawValue(comment, length);
+    }
+
     void PrettyPrefix(Type type) {
         (void)type;
         if (Base::level_stack_.GetSize() != 0) { // this value is not at root
             typename Base::Level* level = Base::level_stack_.template Top<typename Base::Level>();
+
+            if (level->comment) {
+                if (level->comment) {
+                    Base::os_->Put('\n');
+                    WriteIndent();
+                }
+                level->comment = false;
+                level->valueCount++;
+                return;
+            }
 
             if (level->inArray) {
                 if (level->valueCount > 0) {
